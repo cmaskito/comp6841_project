@@ -40,11 +40,12 @@ uintptr_t Memory::GetModuleAddress(const char* moduleName) {
 	MODULEENTRY32 entry;
 	entry.dwSize = sizeof(MODULEENTRY32);
 
-	const auto snapShot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, this->id);
+	const auto snapShot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, this->id);
 
 	uintptr_t retVal = 0;
 
 	while (Module32Next(snapShot, &entry)) {
+		std::cout << "module: " << entry.szModule << std::endl;
 		if (!strcmp(moduleName, entry.szModule)) {
 			retVal = (uintptr_t)entry.modBaseAddr;
 			break;
