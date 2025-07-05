@@ -1,6 +1,8 @@
 #include "memory.h"
 #include <iostream>
 #include <thread>
+#include "entityList.h"
+#include "vector.h"
 
 //namespace offsets {
 //	constexpr std::ptrdiff_t dwLocalPlayerController = 0x1A50AD0;
@@ -10,13 +12,26 @@
 //}
 
 namespace offsets {
-
-	constexpr ::std::ptrdiff_t m_fFlags = 0x104;
+	
+	// client.dll
 	constexpr ::std::ptrdiff_t dwLocalPlayer = 0xDEF97C;
+	constexpr ::std::ptrdiff_t m_fFlags = 0x104;
 	constexpr ::std::ptrdiff_t dwForceJump = 0x52C0F50;
 	constexpr ::std::ptrdiff_t m_iHealth = 0x100;
+	constexpr ::std::ptrdiff_t entityList = 0x4E051DC;
+	constexpr ::std::ptrdiff_t xPos = 0xA0;
+	constexpr ::std::ptrdiff_t yPos = 0xA4;
+	constexpr ::std::ptrdiff_t zPos = 0xA8;
+	
+	//engine.dll
+	constexpr ::std::ptrdiff_t clientState = 0x59F19C;
+	constexpr ::std::ptrdiff_t pitch = 0x4D90;
+	constexpr ::std::ptrdiff_t yaw = 0x4D94;
 
+	
 }
+
+void testFunction();
 
 int main() {
 
@@ -26,22 +41,83 @@ int main() {
 
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
 	std::cout << "client.dll -> " << "0x" << std::hex << client_dll_addr << std::dec << std::endl;
+	std::thread t1(testFunction);
 
 	while (true) {
-
 		const auto dwLocalPlayerPawn = mem.Read<uint32_t>(client_dll_addr + offsets::dwLocalPlayer);
 
 		if (dwLocalPlayerPawn) {
 			const auto onGround = mem.Read<bool>(dwLocalPlayerPawn + offsets::m_fFlags);
 			const auto health = mem.Read<int32_t>(dwLocalPlayerPawn + offsets::m_iHealth);
-			std::cout << onGround << std::endl;
 			if (GetAsyncKeyState(VK_SPACE) && onGround & (1 << 0)) {
-				std::cout << "jump" << std::endl;
 				mem.Write<uint32_t>(client_dll_addr + offsets::dwForceJump, 6);
-
-
 			}
 		}
 	}
-	std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+
+	t1.join();
+}
+
+void testFunction() {
+	//std::cout << "IN test thread" << std::endl;
+
+	auto mem = Memory("csgo.exe");
+	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
+	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
+
+
+	while (true) {
+
+		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
+
+		if (local_player_addr) {
+			const auto entity_ptr = mem.Read<uintptr_t>(client_dll_addr + offsets::entityList + 1 * 0x10);
+			if (entity_ptr) {
+				const auto xPos = mem.Read<float>(local_player_addr + offsets::xPos);
+				const auto yPos = mem.Read<float>(local_player_addr + offsets::yPos);
+				const auto zPos = mem.Read<float>(local_player_addr + offsets::zPos);
+				Vector playerPos = Vector(xPos, yPos, zPos);
+
+		//for (int i = 0; i < 64; i++) {
+				const auto bot_x = mem.Read<float>(entity_ptr + offsets::xPos);
+				const auto bot_y = mem.Read<float>(entity_ptr + offsets::yPos);
+				const auto bot_z = mem.Read<float>(entity_ptr + offsets::zPos);
+				Vector botPos = Vector(bot_x, bot_y, bot_z);
+
+				//const auto health = mem.Read<int32_t>(entity_ptr + offsets::client_dll::m_iHealth);
+				std::cout << botPos << std::endl;
+
+				std::cout << playerPos << std::endl;
+
+				std::cout << botPos.copy().subtract(playerPos) << std::endl; 
+				std::cout << botPos.copy().subtract(playerPos).horizontalAngle() << std::endl;
+
+				const float required_yaw = botPos.copy().subtract(playerPos).horizontalAngle();
+				const float required_pitch = -botPos.copy().subtract(playerPos).verticalAngle();
+
+				const auto client_state = mem.Read<uintptr_t>(engine_dll_addr + offsets::clientState);
+				const auto yaw_addr = client_state + offsets::yaw;
+				const auto pitch_addr = client_state + offsets::pitch;
+
+				std::cout << "engine.dll -> " << "0x" << std::hex << engine_dll_addr << std::dec << std::endl;
+
+				std::cout << "write address -> " << "0x" << std::hex << yaw_addr << std::dec << std::endl;
+
+				mem.Write<float>(yaw_addr, required_yaw);
+				mem.Write<float>(pitch_addr, required_pitch);
+
+			}
+		}
+
+		//}
+
+
+
+		//const auto pitch_addr = 
+
+		std::cout << "===============" << std::endl;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
 }

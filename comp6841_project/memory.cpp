@@ -45,7 +45,6 @@ uintptr_t Memory::GetModuleAddress(const char* moduleName) {
 	uintptr_t retVal = 0;
 
 	while (Module32Next(snapShot, &entry)) {
-		std::cout << "module: " << entry.szModule << std::endl;
 		if (!strcmp(moduleName, entry.szModule)) {
 			retVal = (uintptr_t)entry.modBaseAddr;
 			break;
