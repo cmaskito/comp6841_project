@@ -5,9 +5,9 @@
 
 class Vector {
 public:
-	float x, y, z;
-
-	Vector(float x, float y, float z) {
+	double x, y, z;
+	Vector() = default;
+	Vector(double x, double y, double z) {
 		this->x = x;
 		this->y = y;
 		this->z = z;
@@ -34,16 +34,21 @@ public:
 		return Vector(this->x, this->y, this->z);
 	}
 
-	float horizontalAngle() {
-		float angle_rad = std::atan2(this->y, this->x);
+	double horizontalAngle() {
+		double angle_rad = std::atan2(this->y, this->x);
 		return angle_rad * 180 / std::numbers::pi;
 	}
 
-	float verticalAngle() {
-		float angle_rad = std::atan2(this->z, std::sqrt(std::pow(this->x, 2) + std::pow(this->y, 2)));
+	double verticalAngle() {
+		double angle_rad = std::atan2(this->z, std::sqrt(std::pow(this->x, 2) + std::pow(this->y, 2)));
 		return angle_rad * 180 / std::numbers::pi;
 	}
 
+	double distanceTo(Vector v) {
+		Vector resultant_vec = v.copy().subtract(*this);
+		double distance = std::sqrt(std::pow(resultant_vec.x, 2) + std::pow(resultant_vec.y, 2) + std::pow(resultant_vec.z, 2));
+		return distance;
+	}
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Vector& v) {
