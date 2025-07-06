@@ -12,7 +12,13 @@ namespace offsets {
 	constexpr ::std::ptrdiff_t xPos = 0xA0;
 	constexpr ::std::ptrdiff_t yPos = 0xA4;
 	constexpr ::std::ptrdiff_t zPos = 0xA8;
+	constexpr ::std::ptrdiff_t m_vecViewOffset = 0x108;
 	constexpr ::std::ptrdiff_t m_lifeState = 0x25F;
+
+	constexpr ::std::ptrdiff_t m_dwBoneMatrix = 0x26A8;
+	constexpr ::std::ptrdiff_t headBone = 0x180;
+
+
 
 	//engine.dll
 	constexpr ::std::ptrdiff_t clientState = 0x59F19C;

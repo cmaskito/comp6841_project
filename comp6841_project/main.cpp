@@ -60,6 +60,7 @@ void testFunction() {
 		if (local_player_addr) {
 
 			Entity player = Entity(mem, local_player_addr);
+			player.originPos.add(Vector(0, 0, player.viewOffset)); // add 64 to Z axis to avoid hitting the ground
 			// read entity list
 			std::vector<Entity> entity_list;
 			for (int i = 0; i < 64; i++) {
@@ -70,7 +71,7 @@ void testFunction() {
 					if (entity_ptr == local_player_addr) {
 						continue; // skip local player
 					}
-					entity.distance = player.pos.distanceTo(entity.pos);
+					entity.distance = player.originPos.distanceTo(entity.headBonePos);
 					entity_list.push_back(entity);
 				}
 				else {
@@ -84,16 +85,16 @@ void testFunction() {
 
 			if (GetAsyncKeyState(VK_XBUTTON2) && !entity_list.empty()) {
 				Entity entity = entity_list[0]; // get closest entity
-				const float required_yaw = entity.pos.copy().subtract(player.pos).horizontalAngle();
-				const float required_pitch = -entity.pos.copy().subtract(player.pos).verticalAngle();
+				const float required_yaw = entity.headBonePos.copy().subtract(player.originPos).horizontalAngle();
+				const float required_pitch = -entity.headBonePos.copy().subtract(player.originPos).verticalAngle();
 
 				const auto client_state = mem.Read<uintptr_t>(engine_dll_addr + offsets::clientState);
 				const auto yaw_addr = client_state + offsets::yaw;
 				const auto pitch_addr = client_state + offsets::pitch;
 
-				std::cout << "engine.dll -> " << "0x" << std::hex << engine_dll_addr << std::dec << std::endl;
+				//std::cout << "engine.dll -> " << "0x" << std::hex << engine_dll_addr << std::dec << std::endl;
 
-				std::cout << "write address -> " << "0x" << std::hex << yaw_addr << std::dec << std::endl;
+				std::cout << "headbone pos -> " <<  entity.headBonePos << std::endl;
 
 				mem.Write<float>(yaw_addr, required_yaw);
 				mem.Write<float>(pitch_addr, required_pitch);
@@ -110,6 +111,6 @@ void testFunction() {
 
 		//std::cout << "===============" << std::endl;
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 }
