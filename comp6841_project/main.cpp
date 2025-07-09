@@ -53,9 +53,17 @@ void testFunction() {
 	auto mem = Memory("csgo.exe");
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
 	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
-
+	bool aimbot_enabled = true;
+	bool toggle_was_pressed = false;
 
 	while (true) {
+		bool toggle_pressed = GetAsyncKeyState(VK_XBUTTON1); // Check if the button is pressed
+		if (toggle_pressed && !toggle_was_pressed) {
+			std::cout << "Toggling aimbot: " << GetAsyncKeyState(VK_XBUTTON1) << std::endl;
+			aimbot_enabled = !aimbot_enabled;
+		}
+		toggle_was_pressed = toggle_pressed; // Update the toggle state
+
 		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
 		if (local_player_addr) {
 
@@ -68,7 +76,7 @@ void testFunction() {
 				const auto entity_ptr = mem.Read<uintptr_t>(client_dll_addr + offsets::entityList + i * 0x10);
 				if (entity_ptr) {
 					Entity entity = Entity(mem, entity_ptr);
-					if (entity_ptr == local_player_addr) {
+					if (entity_ptr == local_player_addr || entity.team == player.team || entity.lifeState) {
 						continue; // skip local player
 					}
 					entity.distance = player.originPos.distanceTo(entity.headBonePos);
@@ -83,7 +91,7 @@ void testFunction() {
 				return a.distance < b.distance; // sort by distance, ascending order
 				});
 
-			if (GetAsyncKeyState(VK_XBUTTON2) && !entity_list.empty()) {
+			if (GetAsyncKeyState(VK_LBUTTON) && !entity_list.empty() && aimbot_enabled) {
 				Entity entity = entity_list[0]; // get closest entity
 				const float required_yaw = entity.headBonePos.copy().subtract(player.originPos).horizontalAngle();
 				const float required_pitch = -entity.headBonePos.copy().subtract(player.originPos).verticalAngle();
@@ -111,6 +119,6 @@ void testFunction() {
 
 		//std::cout << "===============" << std::endl;
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 }

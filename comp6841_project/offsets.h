@@ -14,6 +14,7 @@ namespace offsets {
 	constexpr ::std::ptrdiff_t zPos = 0xA8;
 	constexpr ::std::ptrdiff_t m_vecViewOffset = 0x108;
 	constexpr ::std::ptrdiff_t m_lifeState = 0x25F;
+	constexpr ::std::ptrdiff_t m_iTeamNum = 0xF4;
 
 	constexpr ::std::ptrdiff_t m_dwBoneMatrix = 0x26A8;
 	constexpr ::std::ptrdiff_t headBone = 0x180;

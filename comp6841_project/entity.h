@@ -13,6 +13,7 @@ public:
 	uint32_t lifeState;
 	float viewOffset;
 	Vector headBonePos;
+	uint32_t team;
 
 	// Constructor and destructor
 	Entity(Memory& mem, uintptr_t addr) {
@@ -30,6 +31,7 @@ public:
 		const auto headBoneY = mem.Read<float>(boneMatrixPtr + 0x1C + offsets::headBone);
 		const auto headBoneZ = mem.Read<float>(boneMatrixPtr + 0x2C + offsets::headBone);
 		this->headBonePos = Vector(headBoneX, headBoneY, headBoneZ);
+		this->team = mem.Read<uint32_t>(addr + offsets::m_iTeamNum); 
 	}
 
 	~Entity() {
