@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "vector.h"
-#include "offsets.h"
+#include "globals.h"
 
 class Entity
 {
@@ -14,6 +14,7 @@ public:
 	float viewOffset;
 	Vector headBonePos;
 	uint32_t team;
+	bool isDormant;
 
 	// Constructor and destructor
 	Entity(Memory& mem, uintptr_t addr) {
@@ -32,6 +33,7 @@ public:
 		const auto headBoneZ = mem.Read<float>(boneMatrixPtr + 0x2C + offsets::headBone);
 		this->headBonePos = Vector(headBoneX, headBoneY, headBoneZ);
 		this->team = mem.Read<uint32_t>(addr + offsets::m_iTeamNum); 
+		this->isDormant = mem.Read<bool>(addr + offsets::m_bDormant);
 	}
 
 	~Entity() {
