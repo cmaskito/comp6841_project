@@ -15,6 +15,9 @@ namespace offsets {
 	constexpr ::std::ptrdiff_t m_lifeState = 0x25F;
 	constexpr ::std::ptrdiff_t m_iTeamNum = 0xF4;
 	constexpr ::std::ptrdiff_t m_bDormant = 0xED;
+	constexpr ::std::ptrdiff_t m_iGlowIndex = 0x10488;
+	constexpr ::std::ptrdiff_t dwGlowObjectManager = 0x535FCB8;
+
 
 	constexpr ::std::ptrdiff_t m_dwBoneMatrix = 0x26A8;
 	constexpr ::std::ptrdiff_t headBone = 0x180;
@@ -26,6 +29,6 @@ namespace offsets {
 }
 
 namespace globals {
-	inline bool aimbotActive = false;
-	inline bool bHopActive = false;
+	inline bool aimbotActive = true;
+	inline bool bHopActive = true;
 }

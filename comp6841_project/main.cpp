@@ -7,14 +7,17 @@
 #include <vector>
 #include <algorithm>
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_win32.h"
-#include "imgui/imgui_impl_dx9.h"
-#include <d3d9.h>
+//#include "imgui/imgui.h"
+//#include "imgui/imgui_impl_win32.h"
+//#include "imgui/imgui_impl_dx9.h"
+//#include <d3d9.h>
 #include "gui.h"
+#include "esp.h"
 
 void doAimbot(Memory& mem);
 void doBHop(Memory& mem);
+void doEsp(Memory& mem);
+
     
 int main() {
 	
@@ -26,37 +29,92 @@ int main() {
 	std::cout << "client.dll -> " << "0x" << std::hex << client_dll_addr << std::dec << std::endl;
 	std::thread t1(doAimbot, std::ref(mem));
 	std::thread t2(doBHop, std::ref(mem));
-	//doStuff();
+	std::thread t3(doEsp, std::ref(mem));
 
-	gui::CreateHWindow("COMP6841 project", "Cheat menu");
-	gui::CreateDeviceD3D();
-	gui::CreateImGui();
-	while (gui::isOpen) {
-		gui::Render();
-		gui::RenderHelper();
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
+	gui::doGui();
+	//gui::CreateHWindow();
+	//gui::CreateDeviceD3D();
+	//gui::CreateImGui();
+	//while (gui::isOpen) {
+	//	gui::Render();
+	//	//gui::RenderHelper();
+	//	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	//}
 
-	gui::DestroyImGui();
-	gui::CleanupDeviceD3D();
-	gui::DestroyHWindow();
-
-	/*while (true) {
-		const auto dwLocalPlayerPawn = mem.Read<uint32_t>(client_dll_addr + offsets::dwLocalPlayer);
-
-		if (dwLocalPlayerPawn) {
-			const auto onGround = mem.Read<bool>(dwLocalPlayerPawn + offsets::m_fFlags);
-			const auto health = mem.Read<int32_t>(dwLocalPlayerPawn + offsets::m_iHealth);
-			if (GetAsyncKeyState(VK_SPACE) && onGround & (1 << 0)) {
-				mem.Write<uint32_t>(client_dll_addr + offsets::dwForceJump, 6);
-			}
-		}
-	}*/
+	//gui::DestroyImGui();
+	//gui::CleanupDeviceD3D();
+	//gui::DestroyHWindow();
 
 	t1.join();
 	t2.join();
+	t3.join();
 	return 0;
 }
+
+void doEsp(Memory& mem) {
+	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
+	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
+
+	while (gui::isOpen) {
+		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
+		const auto glow_obj_manager = mem.Read<uintptr_t>(client_dll_addr + offsets::dwGlowObjectManager);
+		if (local_player_addr) {
+
+			Entity player = Entity(mem, local_player_addr);
+			player.originPos.add(Vector(0, 0, player.viewOffset)); // get player camera position
+
+			for (int i = 0; i < 64; i++) {
+				const auto entity_ptr = mem.Read<uintptr_t>(client_dll_addr + offsets::entityList + i * 0x10);
+				if (entity_ptr) {
+					Entity entity = Entity(mem, entity_ptr);
+					if ( entity.team == player.team ) {
+						continue; // skip same team
+					}
+					const auto glowIndex = mem.Read<std::int32_t>(entity_ptr + offsets::m_iGlowIndex);
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x8, 1.f);
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0xC, 0.f);
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x10, 0.f);
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x14, 1.f);
+
+					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x27, true);
+					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x28, true);
+
+				}
+				else {
+					break;
+				}
+			}
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+}
+	/*esp::CreateHWindow("ESP", "cheat menu");
+	esp::CreateDeviceD3D();
+	esp::CreateImGui();
+	bool running = true;
+	while (running) {
+		MSG msg;
+		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
+			::TranslateMessage(&msg);
+			::DispatchMessage(&msg);
+		}
+
+		if (msg.message == WM_QUIT) {
+			running = false;
+		}
+
+		if (!running) {
+			break;
+		}
+
+		esp::Render();
+	}
+
+	esp::DestroyImGui();
+	esp::CleanupDeviceD3D();
+	esp::DestroyHWindow();*/
+
 
 void doBHop(Memory& mem) {
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
