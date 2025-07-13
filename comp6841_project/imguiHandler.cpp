@@ -11,14 +11,16 @@
 #include "imgui/imgui_impl_dx11.h"
 #include <d3d11.h>
 #include <tchar.h>
-#include "gui.h"
+#include "imguiHandler.h"
 #include "globals.h"
 #include <thread>
 #include <iostream>
+#include "memory.h"
+#include "esp.h"
 
 
 // Main code
-int gui::doGui()
+int imguiHandler::doGui(Memory& mem)
 {
     // Make process DPI aware and obtain main monitor scale
     ImGui_ImplWin32_EnableDpiAwareness();
@@ -48,12 +50,9 @@ int gui::doGui()
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
-    //style.ScaleAllSizes(main_scale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
-    //style.FontScaleDpi = main_scale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);
@@ -77,23 +76,6 @@ int gui::doGui()
         if (!isOpen)
             break;
 
-        // Handle window being minimized or screen locked
-        /*if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
-        {
-            ::Sleep(10);
-            continue;
-        }
-        g_SwapChainOccluded = false;*/
-
-        // Handle window resize (we don't resize directly in the WM_SIZE handler)
-        /*if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
-        {
-            CleanupRenderTarget();
-            g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
-            g_ResizeWidth = g_ResizeHeight = 0;
-            CreateRenderTarget();
-        }*/
-
         // Start the Dear ImGui frame
         ImGui::SetCurrentContext(guiContext);
 
@@ -101,23 +83,20 @@ int gui::doGui()
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-            ImGui::Begin(
-                "COMP6841 PROJECT - CSGO CHEATS", 
-                &isOpen, 
-                ImGuiWindowFlags_NoResize 
-                | ImGuiWindowFlags_NoCollapse
-            );     // Create a window called "Hello, world!" and append into it.
-                
-            ImGui::Checkbox("Aimbot", &globals::aimbotActive);
-            ImGui::Checkbox("BHop", &globals::bHopActive);
-                
-                
-            ImGui::End();
-        }
+		// Cheat GUI
+        ImGui::Begin(
+            "COMP6841 PROJECT - CSGO CHEATS", 
+            &isOpen, 
+            ImGuiWindowFlags_NoResize 
+            | ImGuiWindowFlags_NoCollapse
+        );
+        ImGui::Checkbox("Aimbot", &globals::aimbotActive);
+        ImGui::Checkbox("BHop", &globals::bHopActive);
+        ImGui::Checkbox("ESP", &globals::espActive);
+        ImGui::Checkbox("Glow", &globals::glowActive);
+        ImGui::End();
+        
+		esp::doEsp(mem);
 
         // Rendering
         ImGui::Render();
@@ -146,7 +125,7 @@ int gui::doGui()
 
 // Helper functions
 
-bool gui::CreateDeviceD3D(HWND hWnd)
+bool imguiHandler::CreateDeviceD3D(HWND hWnd)
 {
     // Setup swap chain
     DXGI_SWAP_CHAIN_DESC sd;
@@ -155,7 +134,7 @@ bool gui::CreateDeviceD3D(HWND hWnd)
     sd.BufferDesc.Width = 0;
     sd.BufferDesc.Height = 0;
     sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
+    sd.BufferDesc.RefreshRate.Numerator = 100;
     sd.BufferDesc.RefreshRate.Denominator = 1;
     sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -179,7 +158,7 @@ bool gui::CreateDeviceD3D(HWND hWnd)
     return true;
 }
 
-void gui::CleanupDeviceD3D()
+void imguiHandler::CleanupDeviceD3D()
 {
     CleanupRenderTarget();
     if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
@@ -187,7 +166,7 @@ void gui::CleanupDeviceD3D()
     if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
 }
 
-void gui::CreateRenderTarget()
+void imguiHandler::CreateRenderTarget()
 {
     ID3D11Texture2D* pBackBuffer;
     g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
@@ -195,7 +174,7 @@ void gui::CreateRenderTarget()
     pBackBuffer->Release();
 }
 
-void gui::CleanupRenderTarget()
+void imguiHandler::CleanupRenderTarget()
 {
     if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
 }
@@ -208,7 +187,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
 // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
 // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-LRESULT WINAPI gui::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT WINAPI imguiHandler::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;

@@ -7,213 +7,102 @@
 #include <dwmapi.h>
 #include <d3d11.h>
 #include <iostream>
+#include "globals.h"
+#include "entity.h"
+#include <thread>
 
+bool esp::entityOnScreen(Entity entity) {
+    return (entity.originPos2D.x > 0 && entity.originPos2D.x < 1920 &&
+        entity.originPos2D.y > 0 && entity.originPos2D.y < 1080);
+}
+ 
+class ViewMatrix {
+public:
+    float matrix[4][4] = {0};
 
-// Forward declare message handler from imgui_impl_win32.cpp
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-LRESULT CALLBACK esp::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
-
-    if (msg == WM_DESTROY) {
-        ::PostQuitMessage(0);
-        return 0;
-
+    ViewMatrix() = default;
+    ViewMatrix(Memory &mem) {
+		auto client_dll_addr = mem.GetModuleAddress("client.dll");
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                this->matrix[i][j] = mem.Read<float>(client_dll_addr + offsets::dwViewMatrix + (i * 4 + j) * sizeof(float));
+            }
+		}
     }
-    return ::DefWindowProcW(hWnd, msg, wParam, lParam);
-}
-
-void esp::CreateHWindow(const char* windowName, const char* className) {
-    wc = {
-        sizeof(wc),
-        CS_HREDRAW | CS_VREDRAW,
-        WndProc,
-        0L,
-        0L,
-        GetModuleHandle(nullptr),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        className,
-        nullptr
-    };
-
-    //RegisterClassExA(&wc);
-    if (!RegisterClassExA(&wc)) {
-        std::cerr << "RegisterClassExA failed. Error: " << GetLastError() << std::endl;
+    ~ViewMatrix() {
     }
-    hWnd = CreateWindowExA(
-        WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED,
-        wc.lpszClassName,
-        windowName,
-        WS_POPUP,
-        0,
-        0,
-        1920,
-        1080,
-        nullptr,
-        nullptr,
-        wc.hInstance,
-        nullptr
-    );
-    std::cout << "wc? " << wc.cbSize << std::endl;
+};
 
-    std::cout << "hWnd? " << hWnd << std::endl;
+Vector2 esp::worldToScreen(float matrix[4][4], Vector pos, Vector2 screenSize) {
+    Vector2 screenPos;
+
+    // use screenW for perspective division
+    float screenW = matrix[3][0] * pos.x + matrix[3][1] * pos.y + matrix[3][2] * pos.z + matrix[3][3];
+
+    screenPos.x = matrix[0][0] * pos.x + matrix[0][1] * pos.y + matrix[0][2] * pos.z + matrix[0][3];
+    screenPos.y = matrix[1][0] * pos.x + matrix[1][1] * pos.y + matrix[1][2] * pos.z + matrix[1][3];
+    if (screenW < 0.001f) {
+        return { -1, -1 }; // behind the camera
+    }
+	// Normalised Device Coordinates (range of [-1, 1] for both x and y)
+	float ndcX = screenPos.x / screenW;
+	float ndcY = screenPos.y / screenW;
 
 
-    SetLayeredWindowAttributes(hWnd, RGB(0, 0, 0), BYTE(255), LWA_ALPHA);
+	// Convert NDC to screen coordinates by mapping distance to center of the screen
+	screenPos.x = (screenSize.x * 0.5f * ndcX) + (ndcX + screenSize.x * 0.5f);
+    screenPos.y = -(screenSize.y * 0.5f * ndcY) + (ndcY + screenSize.y * 0.5f);
 
-    RECT clientArea = {};
-    GetClientRect(hWnd, &clientArea);
-
-    RECT windowArea = {};
-    GetWindowRect(hWnd, &windowArea);
-
-    POINT diff{};
-    ClientToScreen(hWnd, &diff);
-
-    const MARGINS margins = {
-        diff.x,
-        diff.y,
-        clientArea.right,
-        clientArea.bottom
-    };
-
-    DwmExtendFrameIntoClientArea(hWnd, &margins);
-    
+	std::cout << "screenPos: " << screenPos.x << ", " << screenPos.y << std::endl;
+    return screenPos;
 }
 
-void esp::DestroyHWindow() {
-    DestroyWindow(hWnd);
-    UnregisterClassA(wc.lpszClassName, wc.hInstance);
+void esp::doEsp(Memory& mem) {
+    if (!globals::espActive) {
+        return; // if esp is not enabled, do nothing
+	}
+    const auto client_dll_addr = mem.GetModuleAddress("client.dll");
+
+	const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
+    //const auto view_matrix_addr = mem.Read<float*>(client_dll_addr + offsets::dwViewMatrix);
+	ViewMatrix view_matrix = ViewMatrix(mem);
+    if (local_player_addr) {
+
+        Entity player = Entity(mem, local_player_addr);
+        player.originPos.add(Vector(0, 0, player.viewOffset)); // get player camera position
+        
+        for (int i = 0; i < 64; i++) {
+            const auto entity_ptr = mem.Read<uintptr_t>(client_dll_addr + offsets::entityList + i * 0x10);
+            if (entity_ptr) {
+                Entity entity = Entity(mem, entity_ptr);
+                if (entity.team == player.team || entity.lifeState || entity.isDormant) {
+                    continue; // skip same team
+                }
+
+                entity.originPos2D = worldToScreen(view_matrix.matrix, entity.originPos, { 1920, 1080 });
+                entity.viewOffsetPos2D = worldToScreen(view_matrix.matrix, entity.originPos.copy().add(Vector(0, 0, entity.viewOffset)), {1920, 1080});
+
+                if (entityOnScreen(entity)) {
+					float entityHeight = entity.viewOffsetPos2D.y - entity.originPos2D.y;
+                    float boxWidth = entityHeight * 0.3f;
+
+                    // Draw box around entity
+                    ImGui::GetBackgroundDrawList()->AddRect(
+                        { entity.viewOffsetPos2D.x - boxWidth, entity.viewOffsetPos2D.y + entityHeight * 0.1f },
+                        { entity.originPos2D.x + boxWidth, entity.originPos2D.y },
+                        ImColor(1.f, 0.f, 0.f),
+                        0.f,
+                        ImDrawFlags_RoundCornersAll,
+                        1.f
+                    );
+                }
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
-bool esp::CreateDeviceD3D()
-{
-    // Setup swap chain
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
-    sd.BufferCount = 2;
-    sd.BufferDesc.Width = 0;
-    sd.BufferDesc.Height = 0;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = hWnd;
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-    sd.Windowed = TRUE;
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    UINT createDeviceFlags = 0;
-    //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-    D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-    HRESULT res = D3D11CreateDeviceAndSwapChain(
-        nullptr, 
-        D3D_DRIVER_TYPE_HARDWARE, 
-        nullptr, 
-        createDeviceFlags, 
-        featureLevelArray, 
-        2, 
-        D3D11_SDK_VERSION, 
-        &sd, 
-        &g_pSwapChain, 
-        &g_pd3dDevice, 
-        &featureLevel, 
-        &g_pd3dDeviceContext
-    );
-    if (res == DXGI_ERROR_UNSUPPORTED) // Try high-performance WARP software driver if hardware is not available.
-        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-    if (res != S_OK)
-        return false;
-    
-    CreateRenderTarget();
-    return true;
-}
-
-void esp::CleanupDeviceD3D()
-{
-    CleanupRenderTarget();
-    if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
-    if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
-    if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
-}
-
-void esp::CreateRenderTarget()
-{
-    ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
-    pBackBuffer->Release();
-
-    ShowWindow(hWnd, SW_SHOWDEFAULT);
-    UpdateWindow(hWnd);
-}
-
-void esp::CleanupRenderTarget()
-{
-    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
-}
-
-void esp::CreateImGui() {
-    IMGUI_CHECKVERSION();
-    imguiContextDX11 = ImGui::CreateContext();
-    ImGui::SetCurrentContext(imguiContextDX11);
-
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-
-    // Setup scaling
-    ImGuiStyle& style = ImGui::GetStyle();
-    // Setup Platform/Renderer backends
-    ImGui_ImplWin32_Init(hWnd);
-    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-}
-
-void esp::DestroyImGui() {
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-}
-
-void esp::Render() {
-    ImGui::SetCurrentContext(imguiContextDX11);
-    ImGui_ImplDX11_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    std::cout << "esp " << ImGui::GetCurrentContext() << std::endl;
-
-    ImGui::NewFrame();
-    ImGui::GetBackgroundDrawList()->AddCircleFilled({ 500, 500 }, 10.f, ImColor(1.f, 0.f, 0.f));
-
-    ImGui::Render();
-
-    const float clear_color_with_alpha[4] = { 0, 0, 0, 0 };
-    g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-    g_pSwapChain->Present(1U, 0U);
-}
-
-//void esp::RenderHelper() {
-//    ImGui::EndFrame();
-//    g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
-//    g_pd3dDevice->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-//    g_pd3dDevice->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
-//    g_pd3dDevice->Clear(0, nullptr, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_RGBA(0, 0, 0, 255), 1.0f, 0);
-//    if (g_pd3dDevice->BeginScene() >= 0)
-//    {
-//        ImGui::Render();
-//        ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
-//        g_pd3dDevice->EndScene();
-//    }
-//    HRESULT result = g_pd3dDevice->Present(nullptr, nullptr, nullptr, nullptr);
-//    if (result == D3DERR_DEVICELOST)
-//        g_DeviceLost = true;
-//}

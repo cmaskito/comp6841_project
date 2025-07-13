@@ -15,6 +15,8 @@ public:
 	Vector headBonePos;
 	uint32_t team;
 	bool isDormant;
+	Vector2 originPos2D;
+	Vector2 viewOffsetPos2D;
 
 	// Constructor and destructor
 	Entity(Memory& mem, uintptr_t addr) {
@@ -38,11 +40,4 @@ public:
 
 	~Entity() {
 	};
-
-	//// Getters
-	//const Vector& getPos() const { return originPos; }
-	//int getHealth() const { return health; }
-	//float getDistance() const { return distance; }
-	//uint32_t getLifeState() const { return lifeState; }
-	//uintptr_t getAddr() const { return addr; }
-}; //Size: 0x0248
+};

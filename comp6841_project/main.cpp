@@ -11,12 +11,12 @@
 //#include "imgui/imgui_impl_win32.h"
 //#include "imgui/imgui_impl_dx9.h"
 //#include <d3d9.h>
-#include "gui.h"
+#include "imguiHandler.h"
 #include "esp.h"
 
 void doAimbot(Memory& mem);
 void doBHop(Memory& mem);
-void doEsp(Memory& mem);
+void doGlow(Memory& mem);
 
     
 int main() {
@@ -29,21 +29,9 @@ int main() {
 	std::cout << "client.dll -> " << "0x" << std::hex << client_dll_addr << std::dec << std::endl;
 	std::thread t1(doAimbot, std::ref(mem));
 	std::thread t2(doBHop, std::ref(mem));
-	std::thread t3(doEsp, std::ref(mem));
+	std::thread t3(doGlow, std::ref(mem));
 
-	gui::doGui();
-	//gui::CreateHWindow();
-	//gui::CreateDeviceD3D();
-	//gui::CreateImGui();
-	//while (gui::isOpen) {
-	//	gui::Render();
-	//	//gui::RenderHelper();
-	//	std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	//}
-
-	//gui::DestroyImGui();
-	//gui::CleanupDeviceD3D();
-	//gui::DestroyHWindow();
+	imguiHandler::doGui(mem);
 
 	t1.join();
 	t2.join();
@@ -51,11 +39,16 @@ int main() {
 	return 0;
 }
 
-void doEsp(Memory& mem) {
+void doGlow(Memory& mem) {
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
 	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
 
-	while (gui::isOpen) {
+	while (imguiHandler::isOpen) {
+		if (!globals::glowActive) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
+
 		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
 		const auto glow_obj_manager = mem.Read<uintptr_t>(client_dll_addr + offsets::dwGlowObjectManager);
 		if (local_player_addr) {
@@ -89,40 +82,16 @@ void doEsp(Memory& mem) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 }
-	/*esp::CreateHWindow("ESP", "cheat menu");
-	esp::CreateDeviceD3D();
-	esp::CreateImGui();
-	bool running = true;
-	while (running) {
-		MSG msg;
-		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-		}
-
-		if (msg.message == WM_QUIT) {
-			running = false;
-		}
-
-		if (!running) {
-			break;
-		}
-
-		esp::Render();
-	}
-
-	esp::DestroyImGui();
-	esp::CleanupDeviceD3D();
-	esp::DestroyHWindow();*/
-
 
 void doBHop(Memory& mem) {
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
 
-	while (gui::isOpen) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-		if (!globals::bHopActive) continue;
+	while (imguiHandler::isOpen) {
+		if (!globals::bHopActive) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue; 
+		}
+		//std::this_thread::sleep_for(std::chrono::microseconds(500));
 		
 		const auto dwLocalPlayerPawn = mem.Read<uint32_t>(client_dll_addr + offsets::dwLocalPlayer);
 
@@ -141,13 +110,18 @@ void doAimbot(Memory& mem) {
 	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
 	bool toggle_was_pressed = false;
 
-	while (gui::isOpen) {
+	while (imguiHandler::isOpen) {
 		bool toggle_pressed = GetAsyncKeyState(VK_XBUTTON1); // Check if the button is pressed
 		if (toggle_pressed && !toggle_was_pressed) {
 			std::cout << "Toggling aimbot: " << GetAsyncKeyState(VK_XBUTTON1) << std::endl;
 			globals::aimbotActive = !globals::aimbotActive;
 		}
 		toggle_was_pressed = toggle_pressed; // Update the toggle state
+
+		if (!globals::aimbotActive) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
 
 		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
 		if (local_player_addr) {
@@ -175,7 +149,7 @@ void doAimbot(Memory& mem) {
 				return a.distance < b.distance; // sort by distance, ascending order
 				});
 
-			if (GetAsyncKeyState(VK_LBUTTON) && !entity_list.empty() && globals::aimbotActive) {
+			if (GetAsyncKeyState(VK_LBUTTON) && !entity_list.empty()) {
 				Entity entity = entity_list[0]; // get closest entity
 				const float required_yaw = entity.headBonePos.copy().subtract(player.originPos).horizontalAngle();
 				const float required_pitch = -entity.headBonePos.copy().subtract(player.originPos).verticalAngle();
@@ -183,9 +157,6 @@ void doAimbot(Memory& mem) {
 				const auto client_state = mem.Read<uintptr_t>(engine_dll_addr + offsets::clientState);
 				const auto yaw_addr = client_state + offsets::yaw;
 				const auto pitch_addr = client_state + offsets::pitch;
-				std::cout << "origin pos -> " << entity.originPos << std::endl;
-
-				std::cout << "headbone pos -> " <<  entity.headBonePos << std::endl;
 
 				mem.Write<float>(yaw_addr, required_yaw);
 				mem.Write<float>(pitch_addr, required_pitch);

@@ -3,8 +3,9 @@
 #include "imgui/imgui_impl_dx11.h"
 #include <d3d11.h>
 #include <tchar.h>
+#include "memory.h"
 
-namespace gui {
+namespace imguiHandler {
 	inline bool isOpen = true;
 
 	// Data
@@ -22,5 +23,5 @@ namespace gui {
 	void CleanupRenderTarget();
 	LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-	int doGui();
+	int doGui(Memory& mem);
 }

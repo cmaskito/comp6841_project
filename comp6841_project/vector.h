@@ -51,6 +51,39 @@ public:
 	}
 };
 
+class Vector2 {
+public:
+	float x, y;
+	Vector2() = default;
+	Vector2(float x, float y) {
+		this->x = x;
+		this->y = y;
+	}
+	~Vector2() {
+
+	}
+
+	Vector2 add(Vector2 v) {
+		this->x += v.x;
+		this->y += v.y;
+		return *this;
+	}
+
+	Vector2 subtract(Vector2 v) {
+		this->x -= v.x;
+		this->y -= v.y;
+		return *this;
+	}
+
+	Vector2 copy() {
+		return Vector2(this->x, this->y);
+	}
+};
+
 inline std::ostream& operator<<(std::ostream& os, const Vector& v) {
 	return os << '(' << v.x << ", " << v.y << ", " << v.z << ')';
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Vector2& v) {
+	return os << '(' << v.x << ", " << v.y << ')';
 }
