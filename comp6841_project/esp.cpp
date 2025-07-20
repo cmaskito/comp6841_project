@@ -36,11 +36,13 @@ public:
 Vector2 esp::worldToScreen(float matrix[4][4], Vector pos, Vector2 screenSize) {
     Vector2 screenPos;
 
+	// Calculate x and y coordinates in clip space
+    screenPos.x = matrix[0][0] * pos.x + matrix[0][1] * pos.y + matrix[0][2] * pos.z + matrix[0][3];
+    screenPos.y = matrix[1][0] * pos.x + matrix[1][1] * pos.y + matrix[1][2] * pos.z + matrix[1][3];
+
     // use screenW for perspective division
     float screenW = matrix[3][0] * pos.x + matrix[3][1] * pos.y + matrix[3][2] * pos.z + matrix[3][3];
 
-    screenPos.x = matrix[0][0] * pos.x + matrix[0][1] * pos.y + matrix[0][2] * pos.z + matrix[0][3];
-    screenPos.y = matrix[1][0] * pos.x + matrix[1][1] * pos.y + matrix[1][2] * pos.z + matrix[1][3];
     if (screenW < 0.001f) {
         return { -1, -1 }; // behind the camera
     }
@@ -49,7 +51,7 @@ Vector2 esp::worldToScreen(float matrix[4][4], Vector pos, Vector2 screenSize) {
 	float ndcY = screenPos.y / screenW;
 
 
-	// Convert NDC to screen coordinates by mapping distance to center of the screen
+	// Convert normalised device coordinates to actual screen coordinates
 	screenPos.x = (screenSize.x * 0.5f * ndcX) + (ndcX + screenSize.x * 0.5f);
     screenPos.y = -(screenSize.y * 0.5f * ndcY) + (ndcY + screenSize.y * 0.5f);
 

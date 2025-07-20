@@ -58,13 +58,13 @@ void doGlow(Memory& mem) {
 						continue; // skip same team
 					}
 					const auto glowIndex = mem.Read<std::int32_t>(entity_ptr + offsets::m_iGlowIndex);
-					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x8, 1.f);
-					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0xC, 0.f);
-					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x10, 0.f);
-					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x14, 1.f);
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x8, 1.f); // red value
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0xC, 0.f); // green value
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x10, 0.f); // blue value
+					mem.Write<float>(glow_obj_manager + glowIndex * 0x38 + 0x14, 1.f); // alpha value
 
-					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x27, true);
-					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x28, true);
+					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x27, true); // render when occluded
+					mem.Write<bool>(glow_obj_manager + glowIndex * 0x38 + 0x28, true); // render when unoccluded
 
 				}
 				else {
