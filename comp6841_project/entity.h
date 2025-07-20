@@ -36,6 +36,8 @@ public:
 		this->headBonePos = Vector(headBoneX, headBoneY, headBoneZ);
 		this->team = mem.Read<uint32_t>(addr + offsets::m_iTeamNum); 
 		this->isDormant = mem.Read<bool>(addr + offsets::m_bDormant);
+		this->originPos2D = Vector2(0.f, 0.f);
+		this->viewOffsetPos2D = Vector2(0.f, 0.f);
 	}
 
 	~Entity() {

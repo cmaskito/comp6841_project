@@ -1,16 +1,10 @@
 #include "memory.h"
 #include <iostream>
 #include <thread>
-#include "entityList.h"
 #include "vector.h"
 #include "entity.h"
 #include <vector>
 #include <algorithm>
-
-//#include "imgui/imgui.h"
-//#include "imgui/imgui_impl_win32.h"
-//#include "imgui/imgui_impl_dx9.h"
-//#include <d3d9.h>
 #include "imguiHandler.h"
 #include "esp.h"
 
@@ -91,7 +85,6 @@ void doBHop(Memory& mem) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue; 
 		}
-		//std::this_thread::sleep_for(std::chrono::microseconds(500));
 		
 		const auto dwLocalPlayerPawn = mem.Read<uint32_t>(client_dll_addr + offsets::dwLocalPlayer);
 
@@ -106,11 +99,13 @@ void doBHop(Memory& mem) {
 }
 
 void doAimbot(Memory& mem) {
+	// get module addresses
 	const auto client_dll_addr = mem.GetModuleAddress("client.dll");
 	const auto engine_dll_addr = mem.GetModuleAddress("engine.dll");
 	bool toggle_was_pressed = false;
 
 	while (imguiHandler::isOpen) {
+		// check if the toggle button is pressed
 		bool toggle_pressed = GetAsyncKeyState(VK_XBUTTON1); // Check if the button is pressed
 		if (toggle_pressed && !toggle_was_pressed) {
 			std::cout << "Toggling aimbot: " << GetAsyncKeyState(VK_XBUTTON1) << std::endl;
@@ -118,6 +113,7 @@ void doAimbot(Memory& mem) {
 		}
 		toggle_was_pressed = toggle_pressed; // Update the toggle state
 
+		// check if the aimbot is active
 		if (!globals::aimbotActive) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -125,9 +121,9 @@ void doAimbot(Memory& mem) {
 
 		const auto local_player_addr = mem.Read<uintptr_t>(client_dll_addr + offsets::dwLocalPlayer);
 		if (local_player_addr) {
-
 			Entity player = Entity(mem, local_player_addr);
 			player.originPos.add(Vector(0, 0, player.viewOffset)); // get player camera position
+
 			// read entity list
 			std::vector<Entity> entity_list;
 			for (int i = 0; i < 64; i++) {
@@ -135,7 +131,7 @@ void doAimbot(Memory& mem) {
 				if (entity_ptr) {
 					Entity entity = Entity(mem, entity_ptr);
 					if (entity_ptr == local_player_addr || entity.team == player.team || entity.lifeState || entity.isDormant) {
-						continue; // skip local player
+						continue; // skip local player, same team, dead or dormant entities
 					}
 					entity.distance = player.originPos.distanceTo(entity.headBonePos);
 					entity_list.push_back(entity);
@@ -149,6 +145,7 @@ void doAimbot(Memory& mem) {
 				return a.distance < b.distance; // sort by distance, ascending order
 				});
 
+			// On key press, aim at the closest entity
 			if (GetAsyncKeyState(VK_LBUTTON) && !entity_list.empty()) {
 				Entity entity = entity_list[0]; // get closest entity
 				const float required_yaw = entity.headBonePos.copy().subtract(player.originPos).horizontalAngle();
